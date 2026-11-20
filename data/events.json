@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": null,
+  "records": [
+    {
+      "id": "demo-001",
+      "title": "Illustratives Ereignis (Platzhalter)",
+      "category": "diplomacy",
+      "region": "Beispielregion",
+      "coordinates": [
+        15,
+        48
+      ],
+      "date": null,
+      "summary": "Nur UI-Demonstration. Nicht als reale aktuelle Meldung interpretieren.",
+      "status": "demo",
+      "sources": [],
+      "updatedAt": null
+    }
+  ],
+  "categories": [
+    "conflict",
+    "diplomacy",
+    "politics",
+    "economy",
+    "energy",
+    "humanitarian",
+    "security"
+  ],
+  "verification": [
+    "confirmed",
+    "limited",
+    "unverified",
+    "demo"
+  ]
+}
