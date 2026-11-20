@@ -18,5 +18,9 @@ See sources.html. Public, aggregated, non-sensitive military information only. N
 - Weekly archive and export
 - Validation-first data ingestion
 
+## Quality assurance
+
+Every push runs `node scripts/validate-data.mjs` before the Pages deployment. The validator checks data structure and source-link hygiene; it does not fact-check claims. Human editorial review and approval remain mandatory for all weekly updates.
+
 ## Structured data
 `data/events.json` and `data/countries.json` define the data contract. `DATA_MODEL.md` documents the validation and editorial workflow. Current content is demonstrative only.
