@@ -1,25 +1,181 @@
-const map=L.map('map',{worldCopyJump:true}).setView([22,10],2);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',{attribution:'&copy; OpenStreetMap &copy; CARTO',maxZoom:8}).addTo(map);
-const demo=[{type:'conflict',name:'Beispiel: Konfliktzone',place:'Marker ist illustrative Darstellung',lat:32,lon:36,status:'DEMO',desc:'Dieser Marker dient nur zur Demonstration. Vor einer Veröffentlichung werden Lage und Quellen verifiziert.'},{type:'event',name:'Beispiel: Diplomatisches Ereignis',place:'Demo-Marker',lat:48,lon:15,status:'DEMO',desc:'Illustrativer Eintrag; kein aktueller Nachrichtenclaim.'},{type:'event',name:'Beispiel: Krisenregion',place:'Demo-Marker',lat:-5,lon:25,status:'DEMO',desc:'Illustrativer Eintrag; keine Lagebehauptung.'}];
-const colors={conflict:'#d45d5d',event:'#5c94cf'};let layers={events:[],conflicts:[]};
-demo.forEach(d=>{const m=L.circleMarker([d.lat,d.lon],{radius:7,color:colors[d.type],fillColor:colors[d.type],fillOpacity:.8,weight:1}).bindPopup('<b>'+d.name+'</b><br>'+d.place+'<br><small>'+d.status+'</small><p>'+d.desc+'</p>');(d.type==='conflict'?layers.conflicts:layers.events).push(m);m.addTo(map)});
-function toggle(id,arr){const on=document.getElementById(id).checked;arr.forEach(m=>on?m.addTo(map):map.removeLayer(m))}
-document.getElementById('eventsToggle').addEventListener('change',()=>toggle('eventsToggle',layers.events));document.getElementById('conflictsToggle').addEventListener('change',()=>toggle('conflictsToggle',layers.conflicts));
-document.getElementById('influenceToggle').addEventListener('change',e=>{const enabled=e.target.checked;map.getContainer().classList.toggle('influence-preview',enabled);if(enabled){const box=document.querySelector('.right');let inf=document.getElementById('influenceInfo');if(!inf){inf=document.createElement('div');inf.id='influenceInfo';inf.className='note';inf.innerHTML='<b>Einfluss & Bündnisse</b><p>Die Darstellung ist noch nicht mit verifizierten Daten befüllt. Bündnisse werden nicht als automatisch gleichbedeutend mit Einfluss oder Kontrolle dargestellt.</p><p class="source">Methodik und Quellenprüfung in Vorbereitung.</p>';box.insertBefore(inf,box.firstChild.nextSibling)}}else{document.getElementById('influenceInfo')?.remove()}});
-document.getElementById('conflictCount').textContent='Demo';document.getElementById('eventCount').textContent='Demo';
-const feed=document.getElementById('feed');demo.forEach(d=>{const el=document.createElement('article');el.className='event';el.innerHTML='<div class="tag">'+(d.type==='conflict'?'Konflikt / Demo':'Ereignis / Demo')+'</div><h3>'+d.name+'</h3><p>'+d.desc+'</p><div class="source">STATUS: '+d.status+'</div>';feed.append(el)});
-/* Country outline layer from public GeoJSON. This is geographic boundary data, not a source of current political claims. */
-const countryStyle={color:'#62798b',weight:0.65,fillColor:'#34424e',fillOpacity:0.10};
-let countriesLayer;
-fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson').then(r=>{if(!r.ok)throw Error('GeoJSON unavailable');return r.json()}).then(data=>{
- countriesLayer=L.geoJSON(data,{style:countryStyle,onEachFeature:(feature,layer)=>{
-  const p=feature.properties||{};const name=p.ADMIN||p.name||p.NAME||'Land';
-  layer.bindTooltip(name,{sticky:true});
-  layer.on('click',()=>{
-   map.fitBounds(layer.getBounds(),{padding:[20,20],maxZoom:5});
-   const box=document.querySelector('.right');let info=document.getElementById('countryInfo');
-   if(!info){info=document.createElement('div');info.className='note';info.id='countryInfo';box.insertBefore(info,box.firstChild.nextSibling);}
-   info.innerHTML='<b>'+name+'</b><p>Profilstatus: Daten werden recherchiert und vor Veröffentlichung verifiziert.</p><dl><dt>Politik</dt><dd>Derzeit keine geprüften Angaben in dieser Ausgabe.</dd><dt>Bündnisse / Einfluss</dt><dd>Wird quellenbasiert ergänzt; Kategorien und Bewertung transparent dokumentiert.</dd><dt>Militär</dt><dd>Nur aggregierte, öffentlich belegte, nicht-taktische Angaben.</dd><dt>Wirtschaft</dt><dd>Wird ergänzt, sobald vergleichbare Datenquellen bereitstehen.</dd></dl><p><span class="source">Grenzdaten: öffentliches GeoJSON · keine politische Bewertung</span></p>';
+const map = L.map('map', { worldCopyJump: true }).setView([22, 10], 2);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 8
+}).addTo(map);
+
+const palette = {
+  conflict: '#d45d5d', crisis: '#d2a449', incident: '#d2a449',
+  diplomacy: '#5c94cf', politics: '#5c94cf', economy: '#64a77b',
+  energy: '#64a77b', humanitarian: '#b58bd3', security: '#d2a449'
+};
+const state = { events: [], conflicts: [], data: null };
+const feed = document.getElementById('feed');
+const escapeText = value => String(value ?? '');
+const safeExternalLink = (url) => {
+  try { const parsed = new URL(url); return ['https:', 'http:'].includes(parsed.protocol) ? parsed.href : null; }
+  catch { return null; }
+};
+
+function markerFor(record) {
+  const coords = record.coordinates;
+  if (!Array.isArray(coords) || coords.length < 2 || !coords.slice(0, 2).every(Number.isFinite)) return;
+  const [lon, lat] = coords;
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return;
+  const category = String(record.category || 'politics').toLowerCase();
+  const color = palette[category] || '#8da5b9';
+  const marker = L.circleMarker([lat, lon], {
+    radius: record.status === 'demo' ? 6 : 7, color, fillColor: color,
+    fillOpacity: 0.82, weight: 1
   });
- }}).addTo(map);
-}).catch(err=>console.warn('Country boundaries could not be loaded:',err));\n// Load structured event feed; placeholders are explicitly marked and not presented as current facts.\nfetch('data/events.json').then(r=>r.ok?r.json():Promise.reject(r.status)).then(data=>{const feed=document.getElementById('feed');if(!data.records?.length)return;feed.innerHTML='';data.records.forEach(d=>{const el=document.createElement('article');el.className='event';const tag=document.createElement('div');tag.className='tag';tag.textContent=d.status+' · '+d.category;const h=document.createElement('h3');h.textContent=d.title;const p=document.createElement('p');p.textContent=d.summary;const s=document.createElement('div');s.className='source';s.textContent='Status: '+d.status+' · Quellen: '+(d.sources?.length||0);el.append(tag,h,p,s);feed.append(el)});}).catch(()=>console.info('Structured feed unavailable; fallback demo feed remains.'));
+  const popup = document.createElement('div');
+  const heading = document.createElement('b');
+  heading.textContent = escapeText(record.title);
+  const summary = document.createElement('p');
+  summary.textContent = escapeText(record.summary);
+  const status = document.createElement('small');
+  status.textContent = 'Status: ' + escapeText(record.status) + ' · ' + escapeText(record.date || 'Datum nicht angegeben');
+  popup.append(heading, summary, status);
+  marker.bindPopup(popup);
+  const bucket = ['conflict', 'crisis', 'incident'].includes(category) ? state.conflicts : state.events;
+  bucket.push(marker);
+  marker.addTo(map);
+}
+
+function renderFeed(records) {
+  feed.replaceChildren();
+  if (!records.length) {
+    const empty = document.createElement('p');
+    empty.className = 'source';
+    empty.textContent = 'Keine veröffentlichten Ereignisse in diesem Datenstand.';
+    feed.append(empty);
+    return;
+  }
+  records.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).forEach(record => {
+    const article = document.createElement('article');
+    article.className = 'event';
+    const tag = document.createElement('div');
+    tag.className = 'tag';
+    tag.textContent = String(record.status || 'unverified').toUpperCase() + ' · ' + String(record.category || 'Ereignis');
+    const title = document.createElement('h3');
+    title.textContent = escapeText(record.title);
+    const summary = document.createElement('p');
+    summary.textContent = escapeText(record.summary);
+    const meta = document.createElement('div');
+    meta.className = 'source';
+    meta.textContent = [record.date || 'Datum offen', record.region || 'Region offen'].join(' · ');
+    article.append(tag, title, summary, meta);
+    (Array.isArray(record.sources) ? record.sources : []).forEach(source => {
+      const href = safeExternalLink(source.url);
+      if (!href) return;
+      const link = document.createElement('a');
+      link.href = href;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = source.name || 'Quelle';
+      link.className = 'source-link';
+      article.append(link);
+    });
+    feed.append(article);
+  });
+}
+
+function applyLayerToggle(id, markers) {
+  const enabled = document.getElementById(id).checked;
+  markers.forEach(marker => enabled ? marker.addTo(map) : map.removeLayer(marker));
+}
+document.getElementById('eventsToggle').addEventListener('change', () => applyLayerToggle('eventsToggle', state.events));
+document.getElementById('conflictsToggle').addEventListener('change', () => applyLayerToggle('conflictsToggle', state.conflicts));
+
+document.getElementById('influenceToggle').addEventListener('change', event => {
+  const enabled = event.target.checked;
+  map.getContainer().classList.toggle('influence-preview', enabled);
+  let note = document.getElementById('influenceInfo');
+  if (enabled && !note) {
+    note = document.createElement('div');
+    note.id = 'influenceInfo';
+    note.className = 'note';
+    const heading = document.createElement('b');
+    heading.textContent = 'Einfluss & Bündnisse';
+    const paragraph = document.createElement('p');
+    paragraph.textContent = 'Noch keine verifizierten Einflussdaten veröffentlicht. Mitgliedschaft, Partnerschaft, wirtschaftliche Verflechtung und tatsächlicher Einfluss werden getrennt bewertet.';
+    note.append(heading, paragraph);
+    document.querySelector('.right').prepend(note);
+  } else if (!enabled) note?.remove();
+});
+
+document.getElementById('conflictCount').textContent = '—';
+document.getElementById('eventCount').textContent = '—';
+
+fetch('data/events.json')
+  .then(response => { if (!response.ok) throw new Error('HTTP ' + response.status); return response.json(); })
+  .then(data => {
+    if (!Array.isArray(data.records)) throw new Error('Ungültiges Ereignisformat: records fehlt.');
+    state.data = data;
+    data.records.forEach(record => {
+      if (record.status === 'demo') return;
+      markerFor(record);
+    });
+    renderFeed(data.records);
+    document.getElementById('conflictCount').textContent = state.conflicts.length;
+    document.getElementById('eventCount').textContent = state.events.length;
+    applyLayerToggle('eventsToggle', state.events);
+    applyLayerToggle('conflictsToggle', state.conflicts);
+  })
+  .catch(error => {
+    console.error('Ereignisdaten konnten nicht geladen werden:', error);
+    feed.replaceChildren();
+    const message = document.createElement('p');
+    message.className = 'source';
+    message.textContent = 'Ereignisdaten derzeit nicht verfügbar. Es werden keine aktuellen Lagebehauptungen angezeigt.';
+    feed.append(message);
+  });
+
+/* Country boundaries provide geographic context only; they do not imply sovereignty or control assessments. */
+const countryStyle = { color: '#62798b', weight: 0.65, fillColor: '#34424e', fillOpacity: 0.10 };
+fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson')
+  .then(response => { if (!response.ok) throw new Error('GeoJSON unavailable'); return response.json(); })
+  .then(data => {
+    L.geoJSON(data, {
+      style: countryStyle,
+      onEachFeature: (feature, layer) => {
+        const properties = feature.properties || {};
+        const name = properties.ADMIN || properties.name || properties.NAME || 'Land';
+        layer.bindTooltip(name, { sticky: true });
+        layer.on('click', () => {
+          map.fitBounds(layer.getBounds(), { padding: [20, 20], maxZoom: 5 });
+          let panel = document.getElementById('countryInfo');
+          if (!panel) {
+            panel = document.createElement('div');
+            panel.id = 'countryInfo';
+            panel.className = 'note';
+            const right = document.querySelector('.right');
+            right.insertBefore(panel, right.firstChild.nextSibling);
+          }
+          panel.replaceChildren();
+          const heading = document.createElement('b');
+          heading.textContent = name;
+          panel.append(heading);
+          const intro = document.createElement('p');
+          intro.textContent = 'Profilstatus: Für dieses Land liegen in dieser Ausgabe noch keine geprüften Profildaten vor.';
+          panel.append(intro);
+          [
+            ['Politik', 'Noch keine verifizierten Angaben.'],
+            ['Bündnisse / Einfluss', 'Mitgliedschaften, Partnerschaften und Einfluss werden getrennt dokumentiert.'],
+            ['Militär', 'Nur aggregierte, öffentlich belegte und nicht-taktische Angaben.'],
+            ['Wirtschaft', 'Wird mit vergleichbaren Daten und klarer Bezugsperiode ergänzt.']
+          ].forEach(([label, value]) => {
+            const term = document.createElement('b');
+            term.textContent = label;
+            const detail = document.createElement('p');
+            detail.textContent = value;
+            panel.append(term, detail);
+          });
+          const source = document.createElement('p');
+          source.className = 'source';
+          source.textContent = 'Grenzdaten: öffentliches GeoJSON · keine politische Bewertung.';
+          panel.append(source);
+        });
+      }
+    }).addTo(map);
+  })
+  .catch(error => console.warn('Ländergrenzen konnten nicht geladen werden:', error));
