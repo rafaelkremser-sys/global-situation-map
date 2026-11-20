@@ -17,3 +17,6 @@ See sources.html. Public, aggregated, non-sensitive military information only. N
 - Events with timestamps, sources, confidence, review history
 - Weekly archive and export
 - Validation-first data ingestion
+
+## Structured data
+`data/events.json` and `data/countries.json` define the data contract. `DATA_MODEL.md` documents the validation and editorial workflow. Current content is demonstrative only.
