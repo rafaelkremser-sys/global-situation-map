@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": null,
+  "profiles": [
+    {
+      "iso3": "",
+      "name": "",
+      "region": "",
+      "government": "",
+      "alliances": [],
+      "influenceNotes": "",
+      "militaryOverview": "Nur öffentlich belegte, aggregierte, nicht-taktische Angaben.",
+      "economyOverview": "",
+      "recentEvents": [],
+      "sources": [],
+      "confidence": "unverified",
+      "lastReviewed": null
+    }
+  ]
+}
